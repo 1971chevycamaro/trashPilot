@@ -3,7 +3,7 @@ import numpy as np
 from multiprocessing import shared_memory
 import time
 
-cap = cv2.VideoCapture("/home/skylo/Desktop/IMG_2229.MOV")
+cap = cv2.VideoCapture("/dev/video1") # Adjust if necessary
 already_sharing = False 
 
 try:
