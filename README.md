@@ -3,7 +3,8 @@
 </p>
 
 # trashPilot
-its total garbage
+its total garbage  
+this is an experimental repository to document my knowledge of openpilots codebase. inside you will find tools to test and replicate various snippets of openpilots codebase. atm it is only the webcam capture and sharing architecture.
 
 ## setup
 VScode should take care of you  
