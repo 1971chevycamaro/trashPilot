@@ -1,12 +1,12 @@
 import cv2, numpy as np
 
-img = cv2.imread("parsedimage.png")
+img = cv2.imread("assets/samples/visionipc.png")
 h, w = img.shape[:2]
 
 # Example: base H may include scale & translation
 custom_H = np.array([
-    [3, 0.0, 0],
-    [0.0, 3, 0],
+    [.5, 0.0, 659],
+    [0.0, .5, 586],
     [0.0, 0.0, 1.0]
 ], dtype=np.float32)
 
