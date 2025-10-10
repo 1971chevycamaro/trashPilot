@@ -3,8 +3,8 @@
 </p>
 
 # TrashPilot
-its total garbage  
-this is an experimental repository to document my knowledge of openpilot's codebase. inside you will find tools to test and replicate various snippets of openpilot's codebase. atm it is only the webcam capture and sharing architecture.
+*its total garbage*  
+This is an experimental repository designed to be vastly simpler than openpilots. It exists to document my knowledge of openpilot's codebase. Inside you will find tools to test and replicate various snippets of openpilot. Features currently included are webcam capture and sharing architecture, model inference etc.
 
 ## Setup
 ```
