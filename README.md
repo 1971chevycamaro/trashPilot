@@ -15,6 +15,8 @@ make a virtual environment and `pip install -r requirements.txt` (if i keep it u
 for the openpilot dependent files:
 ```git clone --recursive https://github.com/you/trashPilot.git
 cd external/openpilot
+git fetch --tags       # updates the list of releases
+git checkout 5e3fc13751dc9b9c5d5e0991a17c672eda8bd122 # checkout a specific release cuz the models always change
 git lfs install
 git lfs pull
 cd ../..

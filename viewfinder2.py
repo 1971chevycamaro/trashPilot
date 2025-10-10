@@ -22,7 +22,7 @@ def get_warp_corners(H, width, height):
     src /= src[:, [2]]
     return src[:, :2]
 
-def draw_focus_region(img, pts, color=(0,255,0), alpha=0.15):
+def draw_focus_region(img, pts, color=(0,255,0), alpha=0.50):
     """
     Draws a polygon around pts on img.
     Everything outside is dimmed.
@@ -39,16 +39,16 @@ def draw_focus_region(img, pts, color=(0,255,0), alpha=0.15):
     return result
 quad = [(100,100), (400,120), (380,300), (80,280)]
 
-H = np.array([[2.9, 0, 155],
-              [0, 2.9, 418],
-              [0, 0, 1]], np.float32)
+H = np.array([[2.9322348e+00, 1.5542418e-02, 1.5469591e+02],
+ [1.4313864e-02, 2.9198198e+00, 4.2012244e+02],
+ [2.3892755e-05, 1.7017686e-05, 9.9271709e-01]], np.float32)
 # invert the H since were going from source dimensions to dest dimensions
 H = np.linalg.inv(H)
 corners = get_warp_corners(H, 512, 256)
 # print(corners)
 
 img = cv2.imread("assets/samples/visionipc.png")
-vis = draw_focus_region(img, corners)
+vis = draw_focus_region(img, quad)
 cv2.namedWindow("focus", cv2.WINDOW_NORMAL)
 cv2.imshow("focus", vis)
 cv2.waitKey(0)

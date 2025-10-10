@@ -95,6 +95,24 @@ def RGBtoVISIONFMT_half_fast(frameBGR):
 
     return out
 
+def BGR2YYYYUV(frameBGR):
+    """
+    Convert an BGR frame of any size into a 6-channel VISIONFMT.
+    VISIONFMT is equivalent to YUV420 but instead each 2x2 block of Y is split into 4 separate channels on the same axis as U and V.
+    Hence the 6 channels are: Y0, Y1, Y2, Y3, U, V.
+    """
+    yuv = cv2.cvtColor(frameBGR, cv2.COLOR_BGR2YUV)
+    Y, U, V = cv2.split(yuv)
+
+    Y0 = Y[0::2, 0::2]
+    Y1 = Y[0::2, 1::2]
+    Y2 = Y[1::2, 0::2]
+    Y3 = Y[1::2, 1::2]
+
+    Usub = U[0::2, 0::2]
+    Vsub = V[0::2, 0::2]
+
+    return np.stack([Y0, Y1, Y2, Y3, Usub, Vsub], axis=0)
 # load shared library
 # lib = ctypes.CDLL("./blah/libvisionfmt.so")
 
