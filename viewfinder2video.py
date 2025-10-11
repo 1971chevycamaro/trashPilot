@@ -40,8 +40,8 @@ def draw_focus_region(img, pts, color=(0,255,0), alpha=0.50):
     return result
 quad = [(100,100), (400,120), (380,300), (80,280)]
 
-H = np.array([[1, 0, 50],
- [0, 1, 80],
+H = np.array([[.7, 0, 160],
+ [0, .7, 150],
  [0, 0, 1]], np.float32)
 # invert the H since were going from source dimensions to dest dimensions
 H = np.linalg.inv(H)
@@ -62,7 +62,7 @@ while True:
     vis = draw_focus_region(img, corners)
 
     cv2.imshow("warped", BGR2YYYYUV(cv2.warpPerspective(img, H, (512,256),flags=cv2.INTER_NEAREST))[0])
-    if cv2.waitKey(30) == 27:
+    if cv2.waitKey(33)== 27:
         break  # Exit on ESC key
 cap.release()
 cv2.destroyAllWindows()

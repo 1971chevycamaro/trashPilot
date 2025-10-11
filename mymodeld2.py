@@ -22,9 +22,10 @@ policyModelInputs = {
 visionModelOutputs = np.empty((1, 632), dtype=np.float16)
 policyModelOutputs = np.empty((1,5884), dtype=np.float16)
 
-H = np.array([[2.9322348e+00, 1.5542418e-02, 1.5469591e+02],
- [1.4313864e-02, 2.9198198e+00, 4.2012244e+02],
- [2.3892755e-05, 1.7017686e-05, 9.9271709e-01]], np.float32)
+H = np.array([[.7, 0, 160],
+ [0, .7, 150],
+ [0, 0, 1]], np.float32)
+
 
 while True:
   frame0BGR = client.getFrame()
@@ -32,11 +33,11 @@ while True:
   frame1BGR = client.getFrame()
   vEgo = 10.0 
   actuatorDelay = 0.1
-  print(BGR2YYYYUV(cv2.warpPerspective(frame0BGR, H, (512,256),flags=cv2.INTER_NEAREST)).shape)
-  visionModelInputs["img"][0, 0:6, :, :] = BGR2YYYYUV(cv2.warpPerspective(frame0BGR, H, (512,256),flags=cv2.INTER_NEAREST))
-  visionModelInputs["img"][0, 6:12, :, :] = BGR2YYYYUV(cv2.warpPerspective(frame1BGR, H, (512,256),flags=cv2.INTER_NEAREST))   
+  # print(BGR2YYYYUV(cv2.warpPerspective(frame0BGR, H, (512,256),flags=cv2.INTER_NEAREST)).shape)
+  visionModelInputs["img"][0, 0:6, :, :] = BGR2YYYYUV(cv2.warpPerspective(frame0BGR, H, (512,256),flags=cv2.INTER_NEAREST + cv2.WARP_INVERSE_MAP))
+  visionModelInputs["img"][0, 6:12, :, :] = BGR2YYYYUV(cv2.warpPerspective(frame1BGR, H, (512,256),flags=cv2.INTER_NEAREST + cv2.WARP_INVERSE_MAP))   
   visionModelInputs["big_img"] = visionModelInputs["img"] # just duplicate for now
-
+  # np.save("img.npy", visionModelInputs["img"])
   policyModelInputs['desire'][0] = 0
   policyModelInputs['traffic_convention'][0] = [0.0, 1.0]  # RHD
   policyModelInputs['lateral_control_params'][0] = [vEgo, actuatorDelay]
