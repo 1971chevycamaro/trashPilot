@@ -30,4 +30,10 @@ observe your pretty face
 `viewfinder.py` interactively shows the effect of a homography matrix on a provided image (may be buggy)  
 `viewfinder2.py` displays the focus region of a homography matrix on a provided image then shows the result in a new window.  
 the calculations performed in `viewfinder*.py` are used in openpilot's model input pipeline.
+
+`visualization_lanes.py` shows how openpilot's model output is converted to lane lines in 3D space.
+<p align="center">
+  <img src="assets/Figure_1.png" alt="TrashPilot logo" width="300">
+</p>
+
 > Inspired by the ok work at [comma.ai’s openpilot](https://github.com/commaai/openpilot).
