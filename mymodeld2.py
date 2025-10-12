@@ -1,10 +1,11 @@
-# example: build policy numpy_inputs with concrete ONNX shapes
+import class_messaging as messaging
+import time
 import numpy as np
 import onnxruntime as ort
 from utilities import BGR2YYYYUV
 from class_webcam_client import FrameClient
-import time
 import cv2
+
 client = FrameClient()  # attach to shared memory
 drivingPolicy = ort.InferenceSession("external/openpilot/selfdrive/modeld/models/driving_policy.onnx")
 drivingVision = ort.InferenceSession("external/openpilot/selfdrive/modeld/models/driving_vision.onnx")
@@ -22,10 +23,11 @@ policyModelInputs = {
 visionModelOutputs = np.empty((1, 632), dtype=np.float16)
 policyModelOutputs = np.empty((1,5884), dtype=np.float16)
 
-H = np.array([[.7, 0, 160],
- [0, .7, 150],
+H = np.array([[1.8, 0, 190],
+ [0, 1.8, 240],
  [0, 0, 1]], np.float32)
 
+pm = messaging.PubMaster("modelV2")
 
 while True:
   frame0BGR = client.getFrame()
@@ -48,4 +50,6 @@ while True:
   
   visionModelOutputs[:] = drivingVision.run(None, visionModelInputs)[0]
   policyModelOutputs[:] = drivingPolicy.run(None,policyModelInputs)[0]
-  print(policyModelInputs['features_buffer'][0,:,0]) # hidden_state slice
+  pm.send({'laneLines': policyModelOutputs[0][4955:5483].tolist()}) 
+  # print(policyModelInputs['features_buffer'][0,:,0]) # hidden_state slice
+  # print(policyModelOutputs[0][4955:5483].tolist())
