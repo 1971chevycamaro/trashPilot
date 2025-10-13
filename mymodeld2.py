@@ -10,18 +10,18 @@ client = FrameClient()  # attach to shared memory
 drivingPolicy = ort.InferenceSession("external/openpilot/selfdrive/modeld/models/driving_policy.onnx")
 drivingVision = ort.InferenceSession("external/openpilot/selfdrive/modeld/models/driving_vision.onnx")
 visionModelInputs = { # allocate inputs (if we made an array each time it would be slow so we allocate and reuse)
-    "img": np.empty((1, 12, 128, 256), dtype=np.uint8),
-    "big_img": np.empty((1, 12, 128, 256), dtype=np.uint8)
+    "img": np.zeros((1, 12, 128, 256), dtype=np.uint8),
+    "big_img": np.zeros((1, 12, 128, 256), dtype=np.uint8)
 } 
 policyModelInputs = {
-  'desire': np.empty((1, 25, 8), dtype=np.float16),
-  'traffic_convention': np.empty((1, 2), dtype=np.float16),
-  'lateral_control_params': np.empty((1, 2), dtype=np.float16),
-  'prev_desired_curv': np.empty((1, 25, 1), dtype=np.float16),
-  'features_buffer': np.empty((1, 25, 512), dtype=np.float16),
+  'desire': np.zeros((1, 25, 8), dtype=np.float16),
+  'traffic_convention': np.zeros((1, 2), dtype=np.float16),
+  'lateral_control_params': np.zeros((1, 2), dtype=np.float16),
+  'prev_desired_curv': np.zeros((1, 25, 1), dtype=np.float16),
+  'features_buffer': np.zeros((1, 25, 512), dtype=np.float16),
 }
-visionModelOutputs = np.empty((1, 632), dtype=np.float16)
-policyModelOutputs = np.empty((1,5884), dtype=np.float16)
+visionModelOutputs = np.zeros((1, 632), dtype=np.float32)
+policyModelOutputs = np.zeros((1,5884), dtype=np.float32)
 
 H = np.array([[1.8, 0, 190],
  [0, 1.8, 240],
@@ -44,12 +44,15 @@ while True:
   policyModelInputs['traffic_convention'][0] = [0.0, 1.0]  # RHD
   policyModelInputs['lateral_control_params'][0] = [vEgo, actuatorDelay]
   policyModelInputs['prev_desired_curv'][0, :-1] = policyModelInputs['prev_desired_curv'][0, 1:] # shift left
-  policyModelInputs['prev_desired_curv'][0, -1] = policyModelOutputs[0][5880:5882][1] # model only uses last value now
+  policyModelInputs['prev_desired_curv'][0, -1,:] = policyModelOutputs[0][5880:5882][0] # model only uses last value now
   policyModelInputs['features_buffer'][0, :-1] = policyModelInputs['features_buffer'][0, 1:] # shift left
   policyModelInputs['features_buffer'][0, -1] = visionModelOutputs[0][117:629]  # hidden_state slice
   
   visionModelOutputs[:] = drivingVision.run(None, visionModelInputs)[0]
   policyModelOutputs[:] = drivingPolicy.run(None,policyModelInputs)[0]
-  pm.send({'laneLines': policyModelOutputs[0][4955:5483].tolist()}) 
+  # print(policyModelOutputs[0][5880:5882][1])
+  # print(policyModelInputs['prev_desired_curv'])
+  pm.send({'laneLines': policyModelOutputs[0][4955:5483].tolist(), 'action': policyModelOutputs[0][5880:5882].tolist()}) 
+  # print(policyModelOutputs[0][5880:5882][1])
   # print(policyModelInputs['features_buffer'][0,:,0]) # hidden_state slice
   # print(policyModelOutputs[0][4955:5483].tolist())

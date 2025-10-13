@@ -41,7 +41,7 @@ def main():
             # lanes[0] left most lane y values only
             for i in range(4):
                 x = np.array([0, 0.1875, 0.75, 1.6875, 3, 4.6875, 6.75, 9.1875, 12, 15.1875, 18.75, 22.6875, 27, 31.6875, 36.75, 42.1875, 48, 54.1875, 60.75, 67.6875, 75, 82.6875, 90.75, 99.1875, 108, 117.1875, 126.75, 136.6875, 147, 157.6875, 168.75, 180.1875, 192])       # forward distance indices
-                y = lanes[i]*3                     # lateral positions
+                y = lanes[i]*4                     # lateral positions
                 color = [(255,0,0),(0,255,0),(0,255,255),(0,0,255)][i]
                 draw_lane(img, x, y, color)
             # sm.update()   
