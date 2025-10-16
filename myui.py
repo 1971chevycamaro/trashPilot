@@ -7,7 +7,7 @@ from class_webcam_client import FrameClient
 # === CONFIG ===
 client = FrameClient()
 
-SCALE = 3         # pixels per meter
+SCALE = 6         # pixels per meter
 WIDTH, HEIGHT = client.shape[1], client.shape[0]
 print(WIDTH,HEIGHT)
 CENTER_X, CENTER_Y = WIDTH // 2, HEIGHT - 50

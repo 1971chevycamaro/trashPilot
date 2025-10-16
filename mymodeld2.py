@@ -4,6 +4,7 @@ import numpy as np
 import onnxruntime as ort
 from utilities import BGR2YYYYUV
 from class_webcam_client import FrameClient
+import class_transform
 import cv2
 
 client = FrameClient()  # attach to shared memory
@@ -22,23 +23,23 @@ policyModelInputs = {
 }
 visionModelOutputs = np.zeros((1, 632), dtype=np.float32)
 policyModelOutputs = np.zeros((1,5884), dtype=np.float32)
-
-H = np.array([[1.8, 0, 190],
- [0, 1.8, 240],
- [0, 0, 1]], np.float32)
-
+H = class_transform.H # i dont want to have to change the same transform everywhere
+H1 =  H
 pm = messaging.PubMaster("modelV2")
-
+period = 0.20
+frame1BGR = client.getFrame()
 while True:
-  frame0BGR = client.getFrame()
-  time.sleep(0.05) # 20Hz
+  start = time.perf_counter()
+  frame0BGR = frame1BGR
+  # time.sleep(0.05) # 20Hz
   frame1BGR = client.getFrame()
   vEgo = 10.0 
-  actuatorDelay = 0.1
+  actuatorDelay = 0.2
   # print(BGR2YYYYUV(cv2.warpPerspective(frame0BGR, H, (512,256),flags=cv2.INTER_NEAREST)).shape)
-  visionModelInputs["img"][0, 0:6, :, :] = BGR2YYYYUV(cv2.warpPerspective(frame0BGR, H, (512,256),flags=cv2.INTER_NEAREST + cv2.WARP_INVERSE_MAP))
-  visionModelInputs["img"][0, 6:12, :, :] = BGR2YYYYUV(cv2.warpPerspective(frame1BGR, H, (512,256),flags=cv2.INTER_NEAREST + cv2.WARP_INVERSE_MAP))   
-  visionModelInputs["big_img"] = visionModelInputs["img"] # just duplicate for now
+  visionModelInputs["img"][0, 0:6, :, :] = BGR2YYYYUV(cv2.warpPerspective(frame0BGR, H, (512,256),flags=cv2.INTER_NEAREST))
+  visionModelInputs["img"][0, 6:12, :, :] = BGR2YYYYUV(cv2.warpPerspective(frame1BGR, H, (512,256),flags=cv2.INTER_NEAREST))   
+  visionModelInputs["big_img"][0, 0:6, :, :] = BGR2YYYYUV(cv2.warpPerspective(frame0BGR, H1, (512,256),flags=cv2.INTER_NEAREST)) 
+  visionModelInputs["big_img"][0, 6:12, :, :] = BGR2YYYYUV(cv2.warpPerspective(frame1BGR, H1, (512,256),flags=cv2.INTER_NEAREST)) 
   # np.save("img.npy", visionModelInputs["img"])
   policyModelInputs['desire'][0] = 0
   policyModelInputs['traffic_convention'][0] = [0.0, 1.0]  # RHD
@@ -53,6 +54,11 @@ while True:
   # print(policyModelOutputs[0][5880:5882][1])
   # print(policyModelInputs['prev_desired_curv'])
   pm.send({'laneLines': policyModelOutputs[0][4955:5483].tolist(), 'action': policyModelOutputs[0][5880:5882].tolist()}) 
+  elapsed = time.perf_counter() - start
+  sleep_time = period - elapsed
+  if sleep_time > 0:
+    time.sleep(sleep_time)
+  print(1/(time.perf_counter() - start))
   # print(policyModelOutputs[0][5880:5882][1])
   # print(policyModelInputs['features_buffer'][0,:,0]) # hidden_state slice
   # print(policyModelOutputs[0][4955:5483].tolist())

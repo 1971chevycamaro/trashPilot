@@ -1,3 +1,4 @@
+# viewfinder2.py
 import cv2
 import numpy as np
 
@@ -37,21 +38,54 @@ def draw_focus_region(img, pts, color=(0,255,0), alpha=0.50):
     result[mask[:,:,0] > 0] = img[mask[:,:,0] > 0]
     cv2.polylines(result, [pts], True, color, 2)
     return result
-quad = [(100,100), (400,120), (380,300), (80,280)]
-
-H = np.array([[2.9322348e+00, 1.5542418e-02, 1.5469591e+02],
- [1.4313864e-02, 2.9198198e+00, 4.2012244e+02],
- [2.3892755e-05, 1.7017686e-05, 9.9271709e-01]], np.float32)
-# invert the H since were going from source dimensions to dest dimensions
-H = np.linalg.inv(H)
-corners = get_warp_corners(H, 512, 256)
-# print(corners)
 
 img = cv2.imread("assets/samples/visionipc.png")
-vis = draw_focus_region(img, quad)
+
 cv2.namedWindow("focus", cv2.WINDOW_NORMAL)
+cv2.resizeWindow("focus", 900, 600)
+
+def nothing(x): pass
+cv2.createTrackbar("tx", "focus", 0, 1000, nothing)
+cv2.createTrackbar("ty", "focus", 0, 1000, nothing)
+cv2.createTrackbar("scale", "focus", 100, 400, nothing)
+cv2.createTrackbar("rot", "focus", 0, 360, nothing)
+
+width, height = 512, 256
+base_H = np.array([[2.9322348, 0.0155424, 154.69591],
+                   [0.01431386, 2.9198198, 420.12244],
+                   [2.389e-05, 1.701e-05, 0.99271709]], np.float32)
+H_base_inv = np.linalg.inv(base_H)
+
+while True:
+    tx = cv2.getTrackbarPos("tx", "focus") #- 500
+    ty = cv2.getTrackbarPos("ty", "focus") #- 500
+    s = cv2.getTrackbarPos("scale", "focus") / 100.0
+    r = np.deg2rad(cv2.getTrackbarPos("rot", "focus"))
+
+    # Build adjustment matrix
+    cos_r, sin_r = np.cos(r), np.sin(r)
+    adj = np.array([
+        [s*cos_r, -s*sin_r, -tx],
+        [s*sin_r,  s*cos_r, -ty],
+        [0, 0, 1]
+    ], np.float32)
+
+    H = adj  # apply adjustment
+    corners = get_warp_corners(H, width, height)
+    vis = draw_focus_region(img, corners)
+
+    cv2.imshow("focus", vis)
+    key = cv2.waitKey(16) & 0xFF
+    if key == 27 or key == ord('q'):
+        break
+
+cv2.destroyWindow("focus")
+print(H)
+
+corners = get_warp_corners(H, width, height)
+vis = draw_focus_region(img, corners)
 cv2.imshow("focus", vis)
 cv2.waitKey(0)
-cv2.imshow("warped", cv2.warpPerspective(img, H, (512,256),flags=cv2.INTER_NEAREST))
+cv2.imshow("warped", cv2.warpPerspective(img, H, (width, height), flags=cv2.INTER_NEAREST))
 cv2.waitKey(0)
 cv2.destroyAllWindows()

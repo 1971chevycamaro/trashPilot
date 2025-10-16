@@ -1,5 +1,6 @@
 import cv2
 import numpy as np
+import class_transform
 from utilities import BGR2YYYYUV
 from class_webcam_client import FrameClient
 
@@ -42,15 +43,16 @@ def draw_focus_region(img, pts, color=(0,255,0), alpha=0.50):
 
 client = FrameClient()
 img = client.frameStream
-
-H = np.array([[1.8, 0, 190],
- [0, 1.8, 240],
- [0, 0, 1]], np.float32)
+H = class_transform.H
+# H = np.array(
+#   [[   0.73 ,  -0.,   -167.  ],
+#  [   0.,      0.73, -120.  ],
+#  [   0. ,     0.  ,    1.  ]], np.float32)
 # invert the H since were going from source dimensions to dest dimensions
-H = np.linalg.inv(H)
+
 corners = get_warp_corners(H, 512, 256)
 # print(corners)
-
+H = np.linalg.inv(H)
 # img = cv2.imread("assets/samples/visionipc.png")
 
 vis = draw_focus_region(img, corners)
@@ -60,7 +62,7 @@ cv2.waitKey(0)
 while True:
     vis = draw_focus_region(img, corners)
 
-    cv2.imshow("warped", BGR2YYYYUV(cv2.warpPerspective(img, H, (512,256),flags=cv2.INTER_NEAREST))[0])
+    cv2.imshow("warped", BGR2YYYYUV(cv2.warpPerspective(img, H, (512,256),flags=cv2.INTER_NEAREST + cv2.WARP_INVERSE_MAP))[0])
     if cv2.waitKey(1)== 27:
         break  # Exit on ESC key
 cv2.destroyAllWindows()
