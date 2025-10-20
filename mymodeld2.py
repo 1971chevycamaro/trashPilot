@@ -6,6 +6,17 @@ from utilities import BGR2YYYYUV
 from class_webcam_client import FrameClient
 import class_transform
 import cv2
+import can
+bus = can.interface.Bus(
+    channel='can0', 
+    interface='socketcan',
+    can_filters=[{"can_id": 0x440, "can_mask": 0x7FF}]
+    )
+
+def on_message(msg):
+  global vEgo 
+  vEgo = msg.data[2]*.28
+notifier = can.Notifier(bus, [on_message])
 
 client = FrameClient()  # attach to shared memory
 drivingPolicy = ort.InferenceSession("external/openpilot/selfdrive/modeld/models/driving_policy.onnx")
@@ -26,6 +37,7 @@ policyModelOutputs = np.zeros((1,5884), dtype=np.float32)
 H = class_transform.H # i dont want to have to change the same transform everywhere
 H1 =  H
 pm = messaging.PubMaster("modelV2")
+sm = messaging.SubMaster('carState')
 period = 0.20
 frame1BGR = client.getFrame()
 while True:
@@ -33,13 +45,14 @@ while True:
   frame0BGR = frame1BGR
   # time.sleep(0.05) # 20Hz
   frame1BGR = client.getFrame()
-  vEgo = 10.0 
+  # vEgo = 15.0 
   actuatorDelay = 0.2
   # print(BGR2YYYYUV(cv2.warpPerspective(frame0BGR, H, (512,256),flags=cv2.INTER_NEAREST)).shape)
   visionModelInputs["img"][0, 0:6, :, :] = BGR2YYYYUV(cv2.warpPerspective(frame0BGR, H, (512,256),flags=cv2.INTER_NEAREST))
   visionModelInputs["img"][0, 6:12, :, :] = BGR2YYYYUV(cv2.warpPerspective(frame1BGR, H, (512,256),flags=cv2.INTER_NEAREST))   
-  visionModelInputs["big_img"][0, 0:6, :, :] = BGR2YYYYUV(cv2.warpPerspective(frame0BGR, H1, (512,256),flags=cv2.INTER_NEAREST)) 
-  visionModelInputs["big_img"][0, 6:12, :, :] = BGR2YYYYUV(cv2.warpPerspective(frame1BGR, H1, (512,256),flags=cv2.INTER_NEAREST)) 
+  # visionModelInputs["big_img"][0, 0:6, :, :] = BGR2YYYYUV(cv2.warpPerspective(frame0BGR, H1, (512,256),flags=cv2.INTER_NEAREST)) 
+  # visionModelInputs["big_img"][0, 6:12, :, :] = BGR2YYYYUV(cv2.warpPerspective(frame1BGR, H1, (512,256),flags=cv2.INTER_NEAREST)) 
+  visionModelInputs["big_img"] = visionModelInputs["img"] # just duplicate for now
   # np.save("img.npy", visionModelInputs["img"])
   policyModelInputs['desire'][0] = 0
   policyModelInputs['traffic_convention'][0] = [0.0, 1.0]  # RHD
@@ -58,7 +71,9 @@ while True:
   sleep_time = period - elapsed
   if sleep_time > 0:
     time.sleep(sleep_time)
-  print(1/(time.perf_counter() - start))
+  # print(1/(time.perf_counter() - start))
+  # print(vEgo)
   # print(policyModelOutputs[0][5880:5882][1])
   # print(policyModelInputs['features_buffer'][0,:,0]) # hidden_state slice
   # print(policyModelOutputs[0][4955:5483].tolist())
+  print(policyModelOutputs[0][5880:5882][0])

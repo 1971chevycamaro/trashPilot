@@ -1,19 +1,39 @@
-import serial
-import time
 import class_messaging as messaging
+import can
+import time
+# pm = messaging.PubMaster('carState')
 sm = messaging.SubMaster('modelV2')
-# open serial connection to Arduino
-ser = serial.Serial('/dev/ttyACM1', 115200, timeout=1)
-time.sleep(2)  # wait for Arduino reset
+bus = can.interface.Bus(
+    channel='can0', 
+    interface='socketcan',
+    can_filters=[{"can_id": 0x440, "can_mask": 0x7FF}]
+    )
+# def on_message(msg):
+#     pm.send({'carState': {
+#         'vEgo': msg.data[2]*.28
+#     }})
 
-def send_value(x):
-    x = max(-1, min(1, x))  # clamp to -1..1
-    ser.write(f"{x:.3f}\n".encode())
-
+# notifier = can.Notifier(bus, [on_message])
+dir = 0
+msg = can.Message(
+    arbitration_id=0x363,
+    is_extended_id=False
+)
 # example test
 while True:
     if sm.updated():
         val = sm.data()['action'][0]
-        # print(val*10)
-        # val = float(input("Enter value (-1 to 1): "))
-        send_value(val*30)
+        # Determine direction
+        effort = abs(int((val*3000)))
+        if val>0:
+            dir = 1
+        else:
+            dir = 2
+        # clamp effort to [0, 255] just in case
+        effort = max(0, min(150, effort))
+        print([effort, dir])
+        # print(abs(int((val*15000))))
+        msg.data = [effort, dir]
+        bus.send(msg)
+        time.sleep(0.1)
+

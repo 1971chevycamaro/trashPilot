@@ -85,16 +85,4 @@ void loop() {
       Serial.print('\r');
     }
   }
-  // if (Serial.available()) {
-  //   String s = Serial.readStringUntil('\r'); // kind of inefficient to block until the string is fully read but whatever
-  //   CanFrame f = parseSlcan(s);
-
-  //   if (f.valid) {
-  //     // Example action: LED control
-  //     if (f.id == 0x100 && f.data[0] == 0x01) digitalWrite(LED_PIN, HIGH);
-  //     if (f.id == 0x100 && f.data[0] == 0x00) digitalWrite(LED_PIN, LOW);
-  //   }
-  // }
-  Serial.print("t1234112233\r");
-  delay(500);
 }

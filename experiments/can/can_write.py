@@ -3,7 +3,7 @@
 import socket, struct, time
 
 CAN_INTERFACE = 'can0'
-CAN_ID = 0x100 # if we change the CAN_ID to something the arduino isnt looking for it does nothing but recieve all the serial messages
+CAN_ID = 0x363 # if we change the CAN_ID to something the arduino isnt looking for it does nothing but recieve all the serial messages
 
 s = socket.socket(socket.AF_CAN, socket.SOCK_RAW, socket.CAN_RAW)
 s.bind((CAN_INTERFACE,))
