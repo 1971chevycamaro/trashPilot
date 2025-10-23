@@ -4,7 +4,7 @@ from multiprocessing import shared_memory
 import time
 
 # cap = cv2.VideoCapture("assets/samples/videoexample.mp4") # Adjust if necessary
-cap = cv2.VideoCapture("/dev/video1") # Adjust if necessary
+cap = cv2.VideoCapture("/dev/video0") # Adjust if necessary
 already_sharing = False 
 
 try:
