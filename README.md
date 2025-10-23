@@ -23,7 +23,7 @@ git lfs pull
 cd ../..
 ```
 ## Usage
-start `webcam_server_robust.py`  
+start `webcam_server_robust.py` (with your approprivate dev/video*)
 explore the results with any of the `webcam_*.py` files!  
 observe your pretty face
 
