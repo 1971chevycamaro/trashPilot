@@ -58,7 +58,7 @@ while True:
   sleep_time = period - elapsed
   if sleep_time > 0:
     time.sleep(sleep_time)
-  print(1/(time.perf_counter() - start))
+  print(f"{1/(time.perf_counter() - start):.2f} Hz\r", end="")
   # print(policyModelOutputs[0][5880:5882][1])
   # print(policyModelInputs['features_buffer'][0,:,0]) # hidden_state slice
   # print(policyModelOutputs[0][4955:5483].tolist())
