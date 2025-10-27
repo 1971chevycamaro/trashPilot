@@ -75,7 +75,7 @@ pygame.display.set_caption("trashPilot tool")
 pygame.display.set_icon(pygame.image.load("assets/steeringwheel.svg"))
 pygame.font.init()
 sm = messaging.SubMaster('modelV2')
-W, H = 400, 500
+W, H = 300,300
 center_x = W // 2
 screen = pygame.display.set_mode((W, H))
 
@@ -83,10 +83,8 @@ clock = pygame.time.Clock()
 
 font = pygame.font.SysFont('dejavusansmono', 20)
 # wheel = pygame.font.SysFont("segoeuisymbol", 300)  # large font
-wheel = pygame.image.load("assets/steeringwheel.svg")   
-wheel = pygame.transform.smoothscale(wheel, (300, 300))
-ghost = wheel.copy()
-ghost.set_alpha(80)
+wheel_asset = pygame.image.load("assets/steeringwheel.svg")   
+pygame.event.post(pygame.event.Event(pygame.VIDEORESIZE,{'w':W,'h':H}))  # initial resize event
 symbol = "⎉"
 steeringWheel = 0
 control_enabled = True
@@ -131,6 +129,11 @@ while running:
         elif event.type == pygame.VIDEORESIZE:
             W, H = event.w, event.h
             center_x = W // 2
+            dim = min(W-50, H- 160) 
+            wheel = pygame.transform.smoothscale(wheel_asset, (dim, dim))
+            ghost = wheel.copy()
+            ghost.set_alpha(80)
+
 
             # screen = pygame.display.set_mode((W, H), pygame.RESIZABLE)  
     if sm.updated():
@@ -201,12 +204,12 @@ while running:
     screen.fill((30, 30, 30))
     torque_ratio = (steeringWheel.torque/tau_max)*-center_x
     power_ratio = abs((steeringWheel.torque*steeringWheel.velocity)/(tau_max*120)*W)
-    pygame.draw.line(screen, (100,255,100), (center_x, 40),(torque_ratio+center_x+1, 40),10)
-    pygame.draw.line(screen, (255,255,100), (0, 30),(max(1, power_ratio), 30),10)
+    pygame.draw.line(screen, (100,255,100), (center_x, 40),(torque_ratio+center_x+1, 40),5)
+    pygame.draw.line(screen, (255,255,100), (0, 30),(max(1, power_ratio), 30),5)
     draw_torque_graph(screen, torque_history)
     screen.blit(text, (0, 0))
-    screen.blit(ghost_rotated, ghost_rotated.get_rect(center=(center_x, 200)))
-    screen.blit(rotated, rotated.get_rect(center=(center_x, 200)))
+    screen.blit(ghost_rotated, ghost_rotated.get_rect(center=(center_x, wheel.get_height()//2+50 )))
+    screen.blit(rotated, rotated.get_rect(center=(center_x, wheel.get_height()//2+50 )))
     pygame.display.flip()
     dt = clock.tick(30) / 1000
     steeringWheel.update(dt)
