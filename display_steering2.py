@@ -75,7 +75,7 @@ pygame.display.set_caption("trashPilot tool")
 pygame.display.set_icon(pygame.image.load("assets/steeringwheel.svg"))
 pygame.font.init()
 sm = messaging.SubMaster('modelV2')
-W, H = 300,300
+W, H = 400,500
 center_x = W // 2
 screen = pygame.display.set_mode((W, H))
 
@@ -204,8 +204,8 @@ while running:
     screen.fill((30, 30, 30))
     torque_ratio = (steeringWheel.torque/tau_max)*-center_x
     power_ratio = abs((steeringWheel.torque*steeringWheel.velocity)/(tau_max*120)*W)
-    pygame.draw.line(screen, (100,255,100), (center_x, 40),(torque_ratio+center_x+1, 40),5)
-    pygame.draw.line(screen, (255,255,100), (0, 30),(max(1, power_ratio), 30),5)
+    pygame.draw.line(screen, (100,255,100), (center_x, 40),(torque_ratio+center_x+1, 40),10)
+    pygame.draw.line(screen, (255,255,100), (0, 30),(max(1, power_ratio), 30),10)
     draw_torque_graph(screen, torque_history)
     screen.blit(text, (0, 0))
     screen.blit(ghost_rotated, ghost_rotated.get_rect(center=(center_x, wheel.get_height()//2+50 )))
