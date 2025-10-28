@@ -23,13 +23,14 @@ git lfs pull
 cd ../..
 ```
 ## Usage
-start `webcam_server_robust.py` (with your approprivate dev/video*)
-explore the results with any of the `webcam_*.py` files!  
+edit `webcam_server_robust.py` to your approprivate dev/video*
+and explore the results with any of the `webcam_*.py` files!  
 observe your pretty face
 
 `viewfinder.py` interactively shows the effect of a homography matrix on a provided image (may be buggy)  
 `viewfinder2.py` displays the focus region of a homography matrix on a provided image then shows the result in a new window.  
 the calculations performed in `viewfinder*.py` are used in openpilot's model input pipeline.
+`display_*.py` visualizes outputs from other applications. im very fond of `display_steering2.py`
 
 `visualization_lanes.py` shows how openpilot's model output is converted to lane lines in 3D space.
 <p align="center">
