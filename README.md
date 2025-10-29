@@ -29,7 +29,7 @@ observe your pretty face
 
 `viewfinder.py` interactively shows the effect of a homography matrix on a provided image (may be buggy)  
 `viewfinder2.py` displays the focus region of a homography matrix on a provided image then shows the result in a new window.  
-the calculations performed in `viewfinder*.py` are used in openpilot's model input pipeline.
+the calculations performed in `viewfinder*.py` are used in openpilot's model input pipeline. 
 `display_*.py` visualizes outputs from other applications. im very fond of `display_steering2.py`
 
 `visualization_lanes.py` shows how openpilot's model output is converted to lane lines in 3D space.
