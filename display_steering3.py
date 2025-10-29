@@ -1,8 +1,6 @@
 import pygame
 import class_messaging as messaging
 import numpy as np
-import sys
-import numpy as np
 
 class SteeringWheelModel:
     def __init__(self, angle=0.0, velocity=0.0, torque=0.0, inertia=0.01, friction=0.6, damping=0.1):
@@ -71,35 +69,31 @@ def draw_torque_graph(screen, torque_history):
     pygame.draw.line(screen, (100, 100, 100),
                      (graph_left, graph_bottom),
                      (graph_left + graph_width, graph_bottom))
-pygame.display.set_caption("trashPilot tool")
-pygame.display.set_icon(pygame.image.load("assets/steeringwheel.svg"))
-pygame.font.init()
+
 sm = messaging.SubMaster('modelV2')
-W, H = 400,500
-center_x = W // 2
-screen = pygame.display.set_mode((W, H))
-
-clock = pygame.time.Clock()
-
-font = pygame.font.SysFont('dejavusansmono', 20)
-# wheel = pygame.font.SysFont("segoeuisymbol", 300)  # large font
-wheel_asset = pygame.image.load("assets/steeringwheel.svg")   
-pygame.event.post(pygame.event.Event(pygame.VIDEORESIZE,{'w':W,'h':H}))  # initial resize event
-symbol = "⎉"
-steeringWheel = 0
+steeringWheel = SteeringWheelModel(angle=0)
 control_enabled = True
 disable_timer = 0.0
 angle = 0
-curv =0
+curv = 0
 dt = 0
 setup = False
 # Create a list to store recent torque values
 torque_history = []
 max_points = 200  # how many frames to keep in the graph
 
+pygame.font.init()
 
-# Example usage:
-steeringWheel = SteeringWheelModel(angle=0)
+pygame.display.set_caption("trashPilot tool")
+pygame.display.set_icon(pygame.image.load("assets/steeringwheel.svg"))
+W, H = 400,500
+center_x = W // 2
+screen = pygame.display.set_mode((W, H))
+clock = pygame.time.Clock()
+font = pygame.font.SysFont('dejavusansmono', 20)
+wheel_asset = pygame.image.load("assets/steeringwheel.svg")   
+pygame.event.post(pygame.event.Event(pygame.VIDEORESIZE,{'w':W,'h':H}))  # initial resize event
+
 
 running = True
 while running:
@@ -186,11 +180,8 @@ while running:
     # Keep buffer size fixed
     if len(torque_history) > max_points:
         torque_history.pop(0)
-    # print(control_enabled)
-    # if (-0.5 <= error <= 0.5) and (abs(steeringWheel.velocity) < 0.5):
-    #     steeringWheel.torque = 0
-    #     steeringWheel.velocity = 0
-    #     steeringWheel.angle = 50
+
+
     rotated = pygame.transform.rotate(wheel, steeringWheel.angle)
     ghost_rotated = pygame.transform.rotate(ghost, desired_angle)
     
