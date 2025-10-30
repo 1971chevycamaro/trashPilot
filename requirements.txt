@@ -3,3 +3,7 @@ onnx
 onnxruntime
 opencv-python
 numpy
+pycapnp
+pygame
+pyzmq
+python-can

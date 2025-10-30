@@ -1,6 +1,8 @@
 import pygame
 import class_messaging as messaging
 import numpy as np
+import zmq
+import capnp
 
 class SteeringWheelModel:
     def __init__(self, angle=0.0, velocity=0.0, torque=0.0, inertia=0.01, friction=0.6, damping=0.1):
@@ -71,6 +73,11 @@ def draw_torque_graph(screen, torque_history):
                      (graph_left + graph_width, graph_bottom))
 
 sm = messaging.SubMaster('modelV2')
+example_capnp = capnp.load('experiments/messaging/example.capnp')
+ctx = zmq.Context()
+pub = ctx.socket(zmq.PUB)
+pub.bind("tcp://*:5556")
+
 steeringWheel = SteeringWheelModel(angle=0)
 control_enabled = True
 disable_timer = 0.0
@@ -191,7 +198,11 @@ while running:
 
 
     text = font.render(f"Error: {error:6.1f} Torque: {steeringWheel.torque:6.1f} {'AUT' if control_enabled else 'MAN'}", True, (255, 255, 255))
-
+    msg = example_capnp.Status.new_message()
+    msg.id = 1
+    msg.name = "steeringTorque"
+    msg.value = float(np.float32(steeringWheel.torque))
+    pub.send(msg.to_bytes())
     screen.fill((30, 30, 30))
     torque_ratio = (steeringWheel.torque/tau_max)*-center_x
     power_ratio = abs((steeringWheel.torque*steeringWheel.velocity)/(tau_max*120)*W)
