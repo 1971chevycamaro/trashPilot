@@ -6,7 +6,7 @@ import capnp
 example_capnp = capnp.load('experiments/messaging/example.capnp')
 ctx = zmq.Context()
 sub = ctx.socket(zmq.SUB)
-sub.connect("tcp://localhost:5556")
+sub.connect("tcp://localhost:5558")
 sub.setsockopt_string(zmq.SUBSCRIBE, "")
 
 # pm = messaging.PubMaster('carState')

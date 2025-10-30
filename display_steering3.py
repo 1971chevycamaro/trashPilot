@@ -76,7 +76,7 @@ sm = messaging.SubMaster('modelV2')
 example_capnp = capnp.load('experiments/messaging/example.capnp')
 ctx = zmq.Context()
 pub = ctx.socket(zmq.PUB)
-pub.bind("tcp://*:5556")
+pub.bind("tcp://*:5558")
 
 steeringWheel = SteeringWheelModel(angle=0)
 control_enabled = True
