@@ -5,7 +5,7 @@ import zmq
 import capnp
 
 class SteeringWheelModel:
-    def __init__(self, angle=0.0, velocity=0.0, torque=0.0, inertia=0.01, friction=0.6, damping=0.1):
+    def __init__(self, angle=0.0, velocity=0.0, torque=0.0, inertia=0.01, friction=1, damping=0.1, centering=0.01):
         """
         angle     - current angle [deg]
         velocity  - angular velocity [deg/s]
@@ -13,6 +13,7 @@ class SteeringWheelModel:
         inertia   - moment of inertia [kg·m²]
         friction  - dry friction torque [N·m]
         damping   - viscous damping coeff [N·m·s/deg]
+        centering - proportional centering coefficient (N·m/deg) that produces a restoring torque toward zero angle
         """
         self.angle = angle
         self.velocity = velocity
@@ -20,6 +21,7 @@ class SteeringWheelModel:
         self.inertia = inertia
         self.friction = friction
         self.damping = damping
+        self.centering = centering
 
     def update(self, dt):
         # Dry friction torque (Coulomb friction)
@@ -35,8 +37,11 @@ class SteeringWheelModel:
         # Viscous damping torque
         damping_torque = -self.damping * self.velocity
 
+        # Centering (restoring) torque proportional to angle
+        centering_torque = -self.centering * self.angle
+
         # Net torque on the wheel
-        net_torque = self.torque + friction_torque + damping_torque
+        net_torque = self.torque + friction_torque + damping_torque + centering_torque
 
         # Angular acceleration (°/s²)
         accel = (net_torque / self.inertia)
@@ -79,10 +84,11 @@ pub = ctx.socket(zmq.PUB)
 pub.bind("tcp://*:5558")
 
 steeringWheel = SteeringWheelModel(angle=0)
-control_enabled = True
+control_enabled = False
 disable_timer = 0.0
 angle = 0
 curv = 0
+vEgo = 5.0
 dt = 0
 setup = False
 # Create a list to store recent torque values
@@ -95,7 +101,7 @@ pygame.display.set_caption("trashPilot tool")
 pygame.display.set_icon(pygame.image.load("assets/steeringwheel.svg"))
 W, H = 400,500
 center_x = W // 2
-screen = pygame.display.set_mode((W, H))
+screen = pygame.display.set_mode((W, H),pygame.RESIZABLE)
 clock = pygame.time.Clock()
 font = pygame.font.SysFont('dejavusansmono', 20)
 wheel_asset = pygame.image.load("assets/steeringwheel.svg")   
@@ -116,17 +122,20 @@ while running:
                 last_control_enabled = control_enabled
 
                 control_enabled = False
-                steeringWheel.torque = 5
+                steeringWheel.torque = 8
             elif event.key == pygame.K_RIGHT:
                 last_control_enabled = control_enabled
                 control_enabled = False
-                steeringWheel.torque = -5
+                steeringWheel.torque = -8
             
         elif event.type == pygame.KEYUP:
             
             if event.key in (pygame.K_LEFT, pygame.K_RIGHT):
                 control_enabled = last_control_enabled
                 steeringWheel.torque = 0
+            elif event.key == pygame.K_r:
+                steeringWheel.angle = desiredAngle
+                steeringWheel.velocity = 0
         elif event.type == pygame.VIDEORESIZE:
             W, H = event.w, event.h
             center_x = W // 2
@@ -142,14 +151,15 @@ while running:
 
 
 
-    desired_angle = curv * -5000
+    steeringRatio = -3000
+    desiredAngle = curv * steeringRatio
     # PD controller
     if not setup:
-        steeringWheel.angle = desired_angle
+        steeringWheel.angle = desiredAngle
         setup = True
 
     omega = 5.0  # natural frequency of response (~ how fast you want it to move)
-    error = desired_angle - steeringWheel.angle
+    error = desiredAngle - steeringWheel.angle
 
     # Desired acceleration (critically damped response)
     desired_accel = omega**2 * error - 2 * omega * steeringWheel.velocity
@@ -161,6 +171,7 @@ while running:
     # Add friction & damping compensation
     tau_ff += steeringWheel.friction * np.sign(steeringWheel.velocity)
     tau_ff += steeringWheel.damping * steeringWheel.velocity
+    tau_ff += steeringWheel.centering * steeringWheel.angle
     tau_cmd = tau_ff
     tau_max = 12.0
 
@@ -190,7 +201,7 @@ while running:
 
 
     rotated = pygame.transform.rotate(wheel, steeringWheel.angle)
-    ghost_rotated = pygame.transform.rotate(ghost, desired_angle)
+    ghost_rotated = pygame.transform.rotate(ghost, desiredAngle)
     
     # print(error)
 
@@ -198,18 +209,20 @@ while running:
 
 
     text = font.render(f"Error: {error:6.1f} Torque: {steeringWheel.torque:6.1f} {'AUT' if control_enabled else 'MAN'}", True, (255, 255, 255))
+    text2 = font.render(f"{vEgo:2.0f} KM/H", True, (255, 255, 255))
     msg = example_capnp.Status.new_message()
     msg.id = 1
     msg.name = "steeringTorque"
     msg.value = float(np.float32(steeringWheel.torque))
     pub.send(msg.to_bytes())
     screen.fill((30, 30, 30))
-    torque_ratio = (steeringWheel.torque/tau_max)*-center_x
-    power_ratio = abs((steeringWheel.torque*steeringWheel.velocity)/(tau_max*120)*W)
-    pygame.draw.line(screen, (100,255,100), (center_x, 40),(torque_ratio+center_x+1, 40),10)
-    pygame.draw.line(screen, (255,255,100), (0, 30),(max(1, power_ratio), 30),10)
+    torqueRatio = (steeringWheel.torque/tau_max)*-center_x
+    powerRatio = abs((steeringWheel.torque*steeringWheel.velocity)/(tau_max*120)*W)
+    pygame.draw.line(screen, (100,255,100), (center_x, 40),(torqueRatio+center_x+1, 40),10)
+    pygame.draw.line(screen, (255,255,100), (0, 30),(max(1, powerRatio), 30),10)
     draw_torque_graph(screen, torque_history)
     screen.blit(text, (0, 0))
+    screen.blit(text2, (0, 50))
     screen.blit(ghost_rotated, ghost_rotated.get_rect(center=(center_x, wheel.get_height()//2+50 )))
     screen.blit(rotated, rotated.get_rect(center=(center_x, wheel.get_height()//2+50 )))
     pygame.display.flip()

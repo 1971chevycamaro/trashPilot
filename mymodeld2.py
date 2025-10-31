@@ -6,6 +6,17 @@ from utilities import BGR2YYYYUV
 from class_webcam_client import FrameClient
 import class_transform
 import cv2
+# import can
+# bus = can.interface.Bus(
+#     channel='can0', 
+#     interface='socketcan',
+#     can_filters=[{"can_id": 0x440, "can_mask": 0x7FF}]
+#     )
+
+# def on_message(msg):
+#   global vEgo 
+#   vEgo = msg.data[2]*.28
+# notifier = can.Notifier(bus, [on_message])
 
 client = FrameClient()  # attach to shared memory
 drivingPolicy = ort.InferenceSession("external/openpilot/selfdrive/modeld/models/driving_policy.onnx")
@@ -33,7 +44,7 @@ while True:
   frame0BGR = frame1BGR
   # time.sleep(0.05) # 20Hz
   frame1BGR = client.getFrame()
-  vEgo = 10.0 
+  vEgo = 10.0
   actuatorDelay = 0.2
   # print(BGR2YYYYUV(cv2.warpPerspective(frame0BGR, H, (512,256),flags=cv2.INTER_NEAREST)).shape)
   visionModelInputs["img"][0, 0:6, :, :] = BGR2YYYYUV(cv2.warpPerspective(frame0BGR, H, (512,256),flags=cv2.INTER_NEAREST))
