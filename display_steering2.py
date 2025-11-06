@@ -5,7 +5,7 @@ import sys
 import numpy as np
 
 class SteeringWheelModel:
-    def __init__(self, angle=0.0, velocity=0.0, torque=0.0, inertia=0.01, friction=0.6, damping=0.1):
+    def __init__(self, angle=0.0, velocity=0.0, torque=0.0, inertia=0.01, friction=0.6, damping=0.1, timestep = 0.01):
         """
         angle     - current angle [deg]
         velocity  - angular velocity [deg/s]
@@ -20,30 +20,35 @@ class SteeringWheelModel:
         self.inertia = inertia
         self.friction = friction
         self.damping = damping
+        self.timestep = timestep
 
     def update(self, dt):
         # Dry friction torque (Coulomb friction)
-        if abs(self.velocity) > 1e-3:
-            friction_torque = -self.friction * np.sign(self.velocity)
-        else:
-            # Static friction region
-            if abs(self.torque) < self.friction:
-                friction_torque = -self.torque  # cancel torque — stays still
+        dt = 10 if dt > 1 else dt
+        for i in range(int(dt//self.timestep)):
+            if abs(self.velocity) > 1e-3:
+                friction_torque = -self.friction * np.sign(self.velocity)
             else:
-                friction_torque = -self.friction * np.sign(self.torque)
+                # Static friction region
+                if abs(self.torque) < self.friction:
+                    friction_torque = -self.torque  # cancel torque — stays still
+                else:
+                    friction_torque = -self.friction * np.sign(self.torque)
 
-        # Viscous damping torque
-        damping_torque = -self.damping * self.velocity
+            # Viscous damping torque
+            damping_torque = -self.damping * self.velocity
 
-        # Net torque on the wheel
-        net_torque = self.torque + friction_torque + damping_torque
+            # Net torque on the wheel
+            net_torque = self.torque + friction_torque + damping_torque
 
-        # Angular acceleration (°/s²)
-        accel = (net_torque / self.inertia)
+            # Angular acceleration (°/s²)
+            accel = (net_torque / self.inertia)
 
-        # Integrate velocity and angle
-        self.velocity += accel * dt
-        self.angle += self.velocity * dt
+            # Integrate velocity and angle
+            # dt//1
+        
+            self.velocity += accel * self.timestep
+            self.angle += self.velocity * self.timestep
 
 def draw_torque_graph(screen, torque_history):
     graph_height = 100
@@ -115,11 +120,11 @@ while running:
                 last_control_enabled = control_enabled
 
                 control_enabled = False
-                steeringWheel.torque = 5
+                steeringWheel.torque = 8
             elif event.key == pygame.K_RIGHT:
                 last_control_enabled = control_enabled
                 control_enabled = False
-                steeringWheel.torque = -5
+                steeringWheel.torque = -8
             
         elif event.type == pygame.KEYUP:
             
@@ -211,7 +216,8 @@ while running:
     screen.blit(ghost_rotated, ghost_rotated.get_rect(center=(center_x, wheel.get_height()//2+50 )))
     screen.blit(rotated, rotated.get_rect(center=(center_x, wheel.get_height()//2+50 )))
     pygame.display.flip()
-    dt = clock.tick(30) / 1000
+    dt = clock.tick(20) / 1000
+
     steeringWheel.update(dt)
     
 pygame.quit()
