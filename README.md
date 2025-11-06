@@ -34,8 +34,7 @@ the calculations performed in `viewfinder*.py` are used in openpilot's model inp
 
 `visualization_lanes.py` shows how openpilot's model output is converted to lane lines in 3D space.
 <p align="center">
-  <img src="assets/Figure_1.png" alt="TrashPilot logo" width="300">
-  <img src="https://cdn.discordapp.com/attachments/661092776984969265/1436029969422880799/IMG_2449.gif?ex=690e1ea0&is=690ccd20&hm=2b363caf0f699285a8681226538ef94cc5f538e917422026c987e806935fae68&" alt="Demo" width="600">
+  <img src="assets/Figure_1.png" alt="TrashPilot logo" width="45%">
+  <img src="assets/IMG_2449.gif" alt="trashpilot demo" width="45%">
 </p>
-
 > Inspired by the ok work at [comma.ai’s openpilot](https://github.com/commaai/openpilot).
