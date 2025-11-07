@@ -1,0 +1,258 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <title>trashPilot tool (web)</title>
+  <style>
+    html, body { margin: 0; height: 100%; background: #1e1e1e; color: #fff; font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
+    #ui { position: fixed; left: 10px; top: 10px; display: flex; gap: 10px; align-items: center; z-index: 10; }
+    #wrap { width: 100%; height: 100%; display: grid; place-items: center; }
+    #c { width: 100%; height: 100%; display: block; }
+    input[type="range"] { width: 220px; }
+    .pill { padding: 4px 8px; border: 1px solid #555; border-radius: 8px; }
+  </style>
+</head>
+<body>
+  <div id="ui">
+    <span class="pill" id="mode">AUT</span>
+    <label>curv: <input id="curv" type="range" min="-0.02" max="0.02" step="0.0001" value="0"></label>
+    <span id="readout" class="pill"></span>
+  </div>
+  <div id="wrap"><canvas id="c"></canvas></div>
+
+  <script>
+    // --- SteeringWheelModel (web port of your Python class) -------------------
+    class SteeringWheelModel {
+      constructor({ angle=0, velocity=0, torque=0, inertia=0.01, friction=0.6, damping=0.1, timestep=0.01 } = {}) {
+        this.angle = angle;       // deg
+        this.velocity = velocity; // deg/s
+        this.torque = torque;     // N·m
+        this.inertia = inertia;   // kg·m²
+        this.friction = friction; // N·m (Coulomb)
+        this.damping = damping;   // N·m·s/deg
+        this.timestep = timestep; // s (fixed step integrator)
+      }
+      update(dt) {
+        // Clamp runaway dt and integrate in fixed substeps like the Python for-loop
+        dt = dt > 1 ? 1 : dt;
+        const steps = Math.max(1, Math.floor(dt / this.timestep));
+        for (let i = 0; i < steps; i++) {
+          let friction_torque;
+          if (Math.abs(this.velocity) > 1e-3) {
+            friction_torque = -this.friction * Math.sign(this.velocity);
+          } else {
+            if (Math.abs(this.torque) < this.friction) {
+              friction_torque = -this.torque; // cancel -> stick
+            } else {
+              friction_torque = -this.friction * Math.sign(this.torque);
+            }
+          }
+          const damping_torque = -this.damping * this.velocity;
+          const net_torque = this.torque + friction_torque + damping_torque;
+          const accel = net_torque / this.inertia; // deg/s^2
+          this.velocity += accel * this.timestep;
+          this.angle += this.velocity * this.timestep;
+        }
+      }
+    }
+
+    // --- Setup canvas ---------------------------------------------------------
+    const canvas = document.getElementById('c');
+    const ctx = canvas.getContext('2d');
+    function resize() {
+      const dpr = Math.max(1, window.devicePixelRatio || 1);
+      canvas.width = Math.floor(canvas.clientWidth * dpr);
+      canvas.height = Math.floor(canvas.clientHeight * dpr);
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0); // keep drawing in CSS pixels
+    }
+    const ro = new ResizeObserver(resize);
+    ro.observe(document.getElementById('wrap'));
+
+    // --- Load wheel image (SVG works) ----------------------------------------
+    const wheelImg = new Image();
+    wheelImg.src = 'assets/steeringwheel.svg'; // same path as your pygame asset
+    wheelImg.onload = () => { /* ready */ };
+
+    // --- State matching your Python script -----------------------------------
+    const model = new SteeringWheelModel({ angle: 0 });
+    let controlEnabled = true;       // AUT vs MAN
+    let lastControlEnabled = true;
+    let setup = false;
+    let curv = 0;                    // from UI/API; renderer multiplies like Python
+    const tauMax = 12.0;
+    const omega = 5.0;               // natural frequency
+    const torqueHistory = [];
+    const maxPoints = 200;
+
+    // UI
+    const curvSlider = document.getElementById('curv');
+    const modePill  = document.getElementById('mode');
+    const readout   = document.getElementById('readout');
+    curvSlider.addEventListener('input', () => { curv = parseFloat(curvSlider.value); });
+
+    // Keyboard controls (match pygame)
+    window.addEventListener('keydown', (e) => {
+      if (e.repeat) return;
+      if (e.code === 'Space') {
+        controlEnabled = !controlEnabled;
+        model.torque = 0;
+      } else if (e.code === 'ArrowLeft') {
+        lastControlEnabled = controlEnabled;
+        controlEnabled = false;
+        model.torque = 8;
+      } else if (e.code === 'ArrowRight') {
+        lastControlEnabled = controlEnabled;
+        controlEnabled = false;
+        model.torque = -8;
+      }
+    });
+    window.addEventListener('keyup', (e) => {
+      if (e.code === 'ArrowLeft' || e.code === 'ArrowRight') {
+        controlEnabled = lastControlEnabled;
+        model.torque = 0;
+      }
+    });
+
+    // --- External API hook (Electron/Browser): set desired curvature ---------
+    // In Electron, you can expose `window.setCurv` from preload or call it from the devtools.
+    window.setCurv = (v) => { curv = +v; curvSlider.value = curv; };
+
+    // Example WebSocket hook (commented):
+    const ws = new WebSocket('ws://localhost:5558');
+    ws.onmessage = (ev) => {
+      const data = JSON.parse(ev.data); // e.g., { action: [curv] }
+      if (data && Array.isArray(data.action)) window.setCurv(data.action[0]);
+    };
+    const FIXED_DT = 0.01;
+    const GRAPH_DT = 1 / 20;  // 20 Hz graph
+    let simTime = 0;
+    let nextGraph = 0;
+
+    let lastReal = performance.now();
+    function loop(realNow) {
+    const realDt = (realNow - lastReal) / 1000;
+    lastReal = realNow;
+    simTime += realDt;
+
+    // Run physics steps until caught up
+    while (simTime >= FIXED_DT) {
+        const desiredAngle = curv * -5000;
+        const error = desiredAngle - model.angle;
+
+        // PD + feedforward control
+        const desiredAccel = omega ** 2 * error - 2 * omega * model.velocity;
+        let tau = model.inertia * desiredAccel
+                + model.friction * Math.sign(model.velocity || 0)
+                + model.damping * model.velocity;
+        const tauSat = tauMax * Math.tanh(tau / tauMax);
+
+        if (controlEnabled && Math.abs(error) < 2) model.torque = 0;
+        else if (controlEnabled) model.torque = tauSat;
+
+        model.update(FIXED_DT);
+        simTime -= FIXED_DT;
+
+        // log torque at 20 Hz
+        nextGraph -= FIXED_DT;
+        if (nextGraph <= 0) {
+        torqueHistory.push(model.torque);
+        if (torqueHistory.length > maxPoints) torqueHistory.shift();
+        nextGraph += GRAPH_DT;
+        }
+    }
+
+    // Render once per frame
+    const desiredAngle = curv * -5000;
+    const error = desiredAngle - model.angle;
+    draw(ctx, canvas, { model, desiredAngle, error, tauMax, torqueHistory });
+    modePill.textContent = controlEnabled ? 'AUT' : 'MAN';
+    readout.textContent = `Error: ${error.toFixed(1)}  Torque: ${model.torque.toFixed(1)}`;
+
+    requestAnimationFrame(loop);
+    }
+    requestAnimationFrame(loop);
+
+
+    // --- Drawing --------------------------------------------------------------
+    function draw(ctx, canvas, { model, desiredAngle, error, tauMax, torqueHistory }) {
+      const W = canvas.clientWidth | 0;
+      const H = canvas.clientHeight | 0;
+      ctx.clearRect(0, 0, W, H);
+
+      // Bars at the top
+      const centerX = W / 2;
+      const torqueRatio = (model.torque / tauMax) * -centerX;
+      const powerRatio = Math.abs((model.torque * model.velocity) / (tauMax * 120) * W);
+      // power bar (yellow)
+      ctx.lineWidth = 10;
+      ctx.strokeStyle = '#ffff64';
+      line(ctx, 0, 30, Math.max(1, powerRatio), 30);
+      // torque bar (green)
+      ctx.strokeStyle = '#64ff64';
+      line(ctx, centerX, 40, centerX + 1 + torqueRatio, 40);
+
+      // Scrolling torque graph (bottom area, like Python)
+      drawTorqueGraph(ctx, torqueHistory, { W, H, maxTorque: 10, maxPoints });
+
+      // Wheels
+      const dim = Math.min(W - 50, H - 160);
+      const wheelX = centerX;
+      const wheelY = (dim / 2) + 50;
+
+      // ghost (desired)
+      if (wheelImg.complete) {
+        ctx.save();
+        ctx.translate(wheelX, wheelY);
+        ctx.rotate(-(desiredAngle || 0) * Math.PI / 180);
+        ctx.globalAlpha = 0.3;
+        drawCenteredImage(ctx, wheelImg, dim, dim);
+        ctx.restore();
+      }
+
+      // real
+      if (wheelImg.complete) {
+        ctx.save();
+        ctx.translate(wheelX, wheelY);
+        ctx.rotate(-model.angle * Math.PI / 180);
+        ctx.globalAlpha = 1.0;
+        drawCenteredImage(ctx, wheelImg, dim, dim);
+        ctx.restore();
+      }
+    }
+
+    function line(ctx, x1, y1, x2, y2) {
+      ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x2, y2); ctx.stroke();
+    }
+    function drawCenteredImage(ctx, img, w, h) {
+      // Draw scaled to w,h centered at (0,0)
+      const scale = Math.min(w / img.width, h / img.height);
+      const dw = img.width * scale;
+      const dh = img.height * scale;
+      ctx.drawImage(img, -dw / 2, -dh / 2, dw, dh);
+    }
+    function drawTorqueGraph(ctx, history, { W, H, maxTorque=10, maxPoints=200 }) {
+      const graphHeight = 100;
+      const graphBottom = H - graphHeight/2 - 20;
+      const graphLeft = 20;
+      const graphWidth = W - 40;
+      if (history.length < 2) return;
+
+      ctx.strokeStyle = '#64ff64';
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      for (let i = 0; i < history.length; i++) {
+        const tau = history[i];
+        const x = graphLeft + i * (graphWidth / maxPoints);
+        const y = graphBottom - (tau / maxTorque) * (graphHeight / 2);
+        if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+      }
+      ctx.stroke();
+
+      // axis
+      ctx.strokeStyle = '#666';
+      ctx.lineWidth = 1;
+      line(ctx, graphLeft, graphBottom, graphLeft + graphWidth, graphBottom);
+    }
+  </script>
+</body>
+</html>
