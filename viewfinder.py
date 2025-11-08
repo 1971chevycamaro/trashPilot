@@ -1,82 +1,65 @@
-import cv2, numpy as np
+import cv2
+import numpy as np
+import class_transform
+from utilities import BGR2YYYYUV
 
-img = cv2.imread("assets/samples/visionipc.png")
-h, w = img.shape[:2]
+def get_warp_corners(H, width, height):
+    """
+    Returns the 4 source coordinates (float32)
+    that map to the corners of a warpPerspective
+    output of size (width x height).
 
-# Example: base H may include scale & translation
-custom_H = np.array([
-    [.5, 0.0, 659],
-    [0.0, .5, 586],
-    [0.0, 0.0, 1.0]
-], dtype=np.float32)
+    H: 3x3 homography matrix
+    width, height: dimensions of the output image
+    """
+    dst_corners = np.array([
+        [0, 0],
+        [width, 0],
+        [width, height],
+        [0, height]
+    ], dtype=np.float32)
 
-def H_translate(tx, ty):
-    return np.array([[1,0,tx],[0,1,ty],[0,0,1]], dtype=np.float32)
+    pts = np.hstack([dst_corners, np.ones((4,1), np.float32)])  # -> (4,3)
+    src = (np.linalg.inv(H) @ pts.T).T
+    src /= src[:, [2]]
+    return src[:, :2]
 
-def H_scale_top_left(s):
-    return np.array([[s,0,0],[0,s,0],[0,0,1]], dtype=np.float32)
-
-def apply_H(H, pts_xy):
-    pts = np.hstack([pts_xy.astype(np.float32), np.ones((pts_xy.shape[0],1), np.float32)])
-    out = (H @ pts.T).T
-    out /= out[:, [2]]
-    return out[:, :2]
-
-def draw(frame, quad):
-    overlay = frame.copy()
-    mask = np.zeros_like(frame, dtype=np.uint8)
-    pts = quad.reshape((-1,1,2)).astype(np.int32)
+def draw_focus_region(img, pts, color=(0,255,0), alpha=0.50):
+    """
+    Draws a polygon around pts on img.
+    Everything outside is dimmed.
+    pts: array-like of shape (4,2) — polygon corners.
+    """
+    overlay = img.copy()
+    mask = np.zeros_like(img, np.uint8)
+    pts = np.array(pts, np.int32).reshape((-1,1,2))
     cv2.fillPoly(mask, [pts], (255,255,255))
-    dim = cv2.addWeighted(frame, 0.25, np.zeros_like(frame), 0.75, 0)
-    dim[mask[:,:,0] > 0] = overlay[mask[:,:,0] > 0]
-    cv2.polylines(dim, [pts], True, (0,255,0), 4)
-    return dim
+    dimmed = cv2.addWeighted(img, alpha, np.zeros_like(img), 1-alpha, 0)
+    result = dimmed.copy()
+    result[mask[:,:,0] > 0] = img[mask[:,:,0] > 0]
+    cv2.polylines(result, [pts], True, color, 2)
+    return result
 
-# --- UI ---
-cv2.namedWindow("view", cv2.WINDOW_NORMAL)
+# H = class_transform.H
+H = np.array([[2.9319131e+00, 1.6042843e-02, 1.5560883e+02],
+       [1.4114303e-02, 2.9201300e+00, 4.1882837e+02],
+       [2.3538028e-05, 1.7569415e-05, 9.9278069e-01]], dtype=np.float32)
+H = np.linalg.inv(H)
+# invert the H since were going from source dimensions to dest dimensions
 
-# Translation sliders: 0..1000 with 500 = neutral (cancels custom_H translation)
-TX_RANGE = TY_RANGE = 1000
-NEUTRAL_TX = NEUTRAL_TY = 500
+corners = get_warp_corners(H, 512, 256)
+# print(corners)
+H = np.linalg.inv(H)
+img = cv2.imread("assets/samples/visionipc.png")
 
-# Scale slider: 0..400 with 100 = "full image" (combined scale = 1)
-SCALE_RANGE = 400
-NEUTRAL_SCALE = 100
-
-# Derive base scale from custom_H (assume isotropic; use a==d)
-base_scale = float((np.linalg.norm(custom_H[:2,0]) + np.linalg.norm(custom_H[:2,1]))/2)
-
-# Start positions
-tx_start = int(np.clip(NEUTRAL_TX + custom_H[0,2], 0, TX_RANGE))
-ty_start = int(np.clip(NEUTRAL_TY + custom_H[1,2], 0, TY_RANGE))
-scale_start = int(np.clip(NEUTRAL_SCALE * base_scale, 0, SCALE_RANGE))
-
-cv2.createTrackbar("scale (0-400)", "view", scale_start, SCALE_RANGE, lambda *_: None)
-cv2.createTrackbar("tx (0-1000)",  "view", tx_start,   TX_RANGE,    lambda *_: None)
-cv2.createTrackbar("ty (0-1000)",  "view", ty_start,   TY_RANGE,    lambda *_: None)
-
-view_rect = np.array([[0,0],[w,0],[w,h],[0,h]], dtype=np.float32)
-
+vis = draw_focus_region(img, corners)
+cv2.namedWindow("focus", cv2.WINDOW_NORMAL)
+cv2.imshow("focus", vis)
+cv2.waitKey(0)
 while True:
-    s_slider = cv2.getTrackbarPos("scale (0-400)", "view")   # e.g. 157
-    sx = cv2.getTrackbarPos("tx (0-1000)", "view")
-    sy = cv2.getTrackbarPos("ty (0-1000)", "view")
+    vis = draw_focus_region(img, corners)
 
-    # Translation neutral: (500,500) cancels custom_H translation
-    dx = float(sx - (NEUTRAL_TX + custom_H[0,2]))
-    dy = float(sy - (NEUTRAL_TY + custom_H[1,2]))
-
-    # --- KEY MAPPING (correct): ---
-    # s_adj = s_slider / (NEUTRAL_SCALE * base_scale)
-    # H_total = T(dx,dy) @ custom_H @ S_top_left(s_adj)
-    # => Combined scale = base_scale * s_adj = s_slider / NEUTRAL_SCALE
-    #    so slider==100 -> combined==1 (full image), independent of base_scale.
-    s_adj = (s_slider / max(1, NEUTRAL_SCALE * base_scale))
-    H_total = H_translate(dx, dy) @ custom_H @ H_scale_top_left(s_adj)
-
-    quad = apply_H(H_total, view_rect)
-    frame = draw(img, quad)
-    cv2.imshow("view", frame)
-    if cv2.waitKey(16) == 27: break
-
+    cv2.imshow("warped", BGR2YYYYUV(cv2.warpPerspective(img, H, (512,256),flags=cv2.INTER_NEAREST + cv2.WARP_INVERSE_MAP))[0])
+    if cv2.waitKey(1)== 27:
+        break  # Exit on ESC key
 cv2.destroyAllWindows()
