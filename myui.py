@@ -43,6 +43,8 @@ def main():
                 draw_lane(img, x, y, color)
             # sm.update()   
 
+        cv2.imshow("Lane Lines", img)
+
         if cv2.waitKey(int(1000/FPS)) == 27:  # ESC to quit
             break
 
