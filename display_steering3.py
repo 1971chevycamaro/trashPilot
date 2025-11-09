@@ -191,7 +191,7 @@ while running:
     screen.blit(ghost_rotated, ghost_rotated.get_rect(center=(center_x, wheel.get_height()//2+50 )))
     screen.blit(rotated, rotated.get_rect(center=(center_x, wheel.get_height()//2+50 )))
     pygame.display.flip()
-    dt = clock.tick(30) / 1000
+    dt = clock.tick(20) / 1000
     steeringWheel.update(dt)
     
 pygame.quit()
