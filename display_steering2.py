@@ -60,12 +60,12 @@ def draw_torque_graph(screen, torque_history):
     
     # Scale torque values to fit in graph area
     max_torque = 10  # expected torque range (adjust for your system)
-    scale_y = graph_height / (2 * max_torque)  # scale for ±max_torque
+    # scale_y = graph_height / (2 * max_torque)  # scale for ±max_torque
     
     points = []
     for i, tau in enumerate(torque_history):
         x = graph_left + i * (graph_width / max_points)
-        y = graph_bottom - (tau * scale_y * graph_height / graph_height) - (graph_height / 2)
+        # y = graph_bottom - (tau * scale_y * graph_height / graph_height) - (graph_height / 2)
         y = graph_bottom - (tau / max_torque) * (graph_height / 2)
         points.append((x, y))
     

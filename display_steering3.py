@@ -3,52 +3,7 @@ import class_messaging as messaging
 import numpy as np
 import zmq
 import capnp
-
-class SteeringWheelModel:
-    def __init__(self, angle=0.0, velocity=0.0, torque=0.0, inertia=0.01, friction=1, damping=0.1, centering=0.01):
-        """
-        angle     - current angle [deg]
-        velocity  - angular velocity [deg/s]
-        torque    - applied torque [N·m]
-        inertia   - moment of inertia [kg·m²]
-        friction  - dry friction torque [N·m]
-        damping   - viscous damping coeff [N·m·s/deg]
-        centering - proportional centering coefficient (N·m/deg) that produces a restoring torque toward zero angle
-        """
-        self.angle = angle
-        self.velocity = velocity
-        self.torque = torque
-        self.inertia = inertia
-        self.friction = friction
-        self.damping = damping
-        self.centering = centering
-
-    def update(self, dt):
-        # Dry friction torque (Coulomb friction)
-        if abs(self.velocity) > 1e-3:
-            friction_torque = -self.friction * np.sign(self.velocity)
-        else:
-            # Static friction region
-            if abs(self.torque) < self.friction:
-                friction_torque = -self.torque  # cancel torque — stays still
-            else:
-                friction_torque = -self.friction * np.sign(self.torque)
-
-        # Viscous damping torque
-        damping_torque = -self.damping * self.velocity
-
-        # Centering (restoring) torque proportional to angle
-        centering_torque = -self.centering * self.angle
-
-        # Net torque on the wheel
-        net_torque = self.torque + friction_torque + damping_torque + centering_torque
-
-        # Angular acceleration (°/s²)
-        accel = (net_torque / self.inertia)
-
-        # Integrate velocity and angle
-        self.velocity += accel * dt
-        self.angle += self.velocity * dt
+from  class_steering_model import SteeringWheelModel
 
 def draw_torque_graph(screen, torque_history):
     graph_height = 100
@@ -60,12 +15,10 @@ def draw_torque_graph(screen, torque_history):
     
     # Scale torque values to fit in graph area
     max_torque = 10  # expected torque range (adjust for your system)
-    scale_y = graph_height / (2 * max_torque)  # scale for ±max_torque
     
     points = []
     for i, tau in enumerate(torque_history):
         x = graph_left + i * (graph_width / max_points)
-        y = graph_bottom - (tau * scale_y * graph_height / graph_height) - (graph_height / 2)
         y = graph_bottom - (tau / max_torque) * (graph_height / 2)
         points.append((x, y))
     
@@ -83,7 +36,8 @@ ctx = zmq.Context()
 pub = ctx.socket(zmq.PUB)
 pub.bind("tcp://*:5558")
 
-steeringWheel = SteeringWheelModel(angle=0)
+steeringWheel = SteeringWheelModel(angle=0, centering=0.05,damping=0.1,sfriction=0,kfriction=0.7)
+desiredAngle = 0
 control_enabled = False
 disable_timer = 0.0
 angle = 0
@@ -151,7 +105,7 @@ while running:
 
 
 
-    steeringRatio = -3000
+    steeringRatio = -3500
     desiredAngle = curv * steeringRatio
     # PD controller
     if not setup:
@@ -165,15 +119,14 @@ while running:
     desired_accel = omega**2 * error - 2 * omega * steeringWheel.velocity
 
     # Compute required torque to make that acceleration happen
-    I = steeringWheel.inertia
+    I = steeringWheel.inertia  # noqa: E741
     tau_ff = I * desired_accel
 
     # Add friction & damping compensation
-    tau_ff += steeringWheel.friction * np.sign(steeringWheel.velocity)
+    tau_ff += steeringWheel.kfriction * np.sign(steeringWheel.velocity)
     tau_ff += steeringWheel.damping * steeringWheel.velocity
-    tau_ff += steeringWheel.centering * steeringWheel.angle
     tau_cmd = tau_ff
-    tau_max = 12.0
+    tau_max = 14.0
 
     # soft saturation with tanh
     tau_sat = tau_max * np.tanh(tau_cmd / tau_max)
@@ -188,9 +141,9 @@ while running:
 
 
     #randomly disable acceration for testing
-    if control_enabled and abs(error) < 2:
+    if control_enabled and abs(error) < 1:
         steeringWheel.torque = 0
-    elif control_enabled and (abs(error) > 2):
+    elif control_enabled and (abs(error) > 1):
         steeringWheel.torque = tau_sat
     # After computing steeringWheel.torque:
     torque_history.append(steeringWheel.torque)
@@ -217,8 +170,10 @@ while running:
     pub.send(msg.to_bytes())
     screen.fill((30, 30, 30))
     torqueRatio = (steeringWheel.torque/tau_max)*-center_x
+    antiTorqueRatio = ((steeringWheel.net_torque-steeringWheel.torque)/tau_max)*-center_x
     powerRatio = abs((steeringWheel.torque*steeringWheel.velocity)/(tau_max*120)*W)
     pygame.draw.line(screen, (100,255,100), (center_x, 40),(torqueRatio+center_x+1, 40),10)
+    pygame.draw.line(screen, (255,100,100), (center_x, 40),(antiTorqueRatio+center_x+1, 40),10)
     pygame.draw.line(screen, (255,255,100), (0, 30),(max(1, powerRatio), 30),10)
     draw_torque_graph(screen, torque_history)
     screen.blit(text, (0, 0))
