@@ -31,9 +31,6 @@ def main():
     while True:
         # img = np.zeros((HEIGHT, WIDTH, 3), np.uint8)
         img = client.getFrame()
-        cv2.putText(img, "Lane line top-down (x=fwd, y=left)", (10, 20),
-                    cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255,255,255), 1)
-
         if sm.updated():
             arr = sm.data()['laneLines']
             arr = np.array(arr[0:264][0::2])
@@ -45,10 +42,6 @@ def main():
                 color = [(255,0,0),(0,255,0),(0,255,255),(0,0,255)][i]
                 draw_lane(img, x, y, color)
             # sm.update()   
-
-        # Draw ego car
-        cv2.circle(img, (CENTER_X, CENTER_Y), 5, (0,0,255), -1)
-        cv2.imshow("Lane Lines", img)
 
         if cv2.waitKey(int(1000/FPS)) == 27:  # ESC to quit
             break
