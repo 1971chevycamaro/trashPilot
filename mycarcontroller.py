@@ -6,40 +6,50 @@ import capnp
 
 example_capnp = capnp.load('experiments/messaging/example.capnp')
 ctx = zmq.Context()
+# SUB: torque commands
 sub = ctx.socket(zmq.SUB)
 sub.connect("tcp://localhost:5558")
 sub.setsockopt_string(zmq.SUBSCRIBE, "")
 
+# PUB: vehicle state (vEgo) -> model consumers
+pub = ctx.socket(zmq.PUB)
+pub.bind("tcp://*:5556")
+
+
 # Check if can0 exists
 can_available = os.path.exists('/sys/class/net/can0')
-
-bus = None
 if can_available:
     bus = can.interface.Bus(
         channel='can0',
         interface='socketcan',
         can_filters=[{"can_id": 0x440, "can_mask": 0x7FF}]
     )
-else:
-    print("!!! can0 not found — printing instead of sending")
-
-msg = can.Message(
-    arbitration_id=0x363,
-    is_extended_id=False
-)
+vEgo = 13
 
 while True:
-    raw = sub.recv()
-    with example_capnp.Status.from_bytes(raw) as torque_msg:
-        val = torque_msg.value
-        effort = abs(int((val / 12 * 250)))
-        dir = 2 if val > 0 else 1
-        effort = max(0, min(150, effort))
-        msg.data = [effort, dir]
+    # m = bus.recv(timeout=0.0)
+    # vEgo = float(m.data[2]) * 0.28
+    vego_msg = example_capnp.Status.new_message(id=2, name="vEgo", value=vEgo)
+    pub.send(vego_msg.to_bytes())
+    try: # look for a torque message
+        raw = sub.recv(flags=zmq.NOBLOCK)
 
-        if can_available:
-            bus.send(msg)
-        else:
-            print("bus send", [effort, dir])
-
-        # time.sleep(0.1)
+        with example_capnp.Status.from_bytes(raw) as torque_msg:
+            val = torque_msg.value
+            effort = abs(int((val / 12 * 250)))
+            dir = 2 if val > 0 else 1
+            effort = max(0, min(110, effort))
+            msg = can.Message(
+                arbitration_id=0x363,
+                is_extended_id=False,
+                data = [effort, dir]
+                )
+            if can_available:
+                bus.send(msg)
+            else:
+                print("bus send", [effort, dir])
+    except zmq.Again:
+        pass
+        time.sleep(0.1)
+# sudo slcand -S 115200 ttyACM0 can0 && sudo ifconfig can0 up 
+# candump can0

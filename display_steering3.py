@@ -36,7 +36,11 @@ ctx = zmq.Context()
 pub = ctx.socket(zmq.PUB)
 pub.bind("tcp://*:5558")
 
-steeringWheel = SteeringWheelModel(angle=0, centering=0.05,damping=0.1,sfriction=0,kfriction=0.7)
+sub = ctx.socket(zmq.SUB)
+sub.connect("tcp://localhost:5556")
+sub.setsockopt_string(zmq.SUBSCRIBE, "")
+
+steeringWheel = SteeringWheelModel(inertia=0.01, centering=0.05,damping=0.1,sfriction=0,kfriction=0.7)
 desiredAngle = 0
 control_enabled = False
 disable_timer = 0.0
@@ -158,8 +162,14 @@ while running:
     
     # print(error)
 
-
-
+    # try to get realtime vEgo from socket
+    try:
+      raw = sub.recv(flags=zmq.NOBLOCK)
+      with example_capnp.Status.from_bytes(raw) as s:
+        if s.name == "vEgo":
+          vEgo = float(s.value)
+    except zmq.Again:
+      pass
 
     text = font.render(f"Error: {error:6.1f} Torque: {steeringWheel.torque:6.1f} {'AUT' if control_enabled else 'MAN'}", True, (255, 255, 255))
     text2 = font.render(f"{vEgo:2.0f} KM/H", True, (255, 255, 255))

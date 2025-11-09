@@ -6,7 +6,8 @@ from utilities import BGR2YYYYUV
 from class_webcam_client import FrameClient
 import class_transform
 import cv2
-
+import zmq
+import capnp
 class ModelRunner:
   def __init__(self):
     self.drivingPolicy = ort.InferenceSession("external/openpilot/selfdrive/modeld/models/driving_policy.onnx")
@@ -41,20 +42,39 @@ class ModelRunner:
     self.policyModelOutputs[:] = self.drivingPolicy.run(None,self.policyModelInputs)[0]
 
 client = FrameClient()  # attach to shared memory
-model1 = ModelRunner()
+models = [ModelRunner(),ModelRunner()]
+period = 1/(len(models)*5)
 
 
 H = class_transform.H # i dont want to have to change the same transform everywhere
 H1 =  H
 pm = messaging.PubMaster("modelV2")
-period = 0.20
+vEgo = 10.0
+
+# Subscribe to vEgo published by mycarcontroller.py (capnp Status on tcp://localhost:5556)
+example_capnp = capnp.load('experiments/messaging/example.capnp')
+ctx = zmq.Context.instance()
+vego_sub = ctx.socket(zmq.SUB)
+vego_sub.setsockopt_string(zmq.SUBSCRIBE, "")
+vego_sub.setsockopt(zmq.CONFLATE, 1)
+vego_sub.connect("tcp://localhost:5556")
 while True:
-  start = time.perf_counter()
-  frame0 = BGR2YYYYUV(cv2.warpPerspective(client.frameStream, H, (512,256),flags=cv2.INTER_NEAREST))
-  model1.run(frame0,10,0.2)
-  pm.send({'laneLines': model1.policyModelOutputs[0][4955:5483].tolist(), 'action': model1.policyModelOutputs[0][5880:5882].tolist()}) 
-  elapsed = time.perf_counter() - start
-  sleep_time = period - elapsed
-  if sleep_time > 0:
-    time.sleep(sleep_time)
-  print(f"{1/(time.perf_counter() - start):.2f} Hz\r", end="")
+  for model in models:
+    start = time.perf_counter()
+    # Non-blocking read of latest vEgo
+    try:
+      raw = vego_sub.recv(flags=zmq.NOBLOCK)
+      with example_capnp.Status.from_bytes(raw) as s:
+        if s.name == "vEgo":
+          vEgo = float(s.value)
+    except zmq.Again:
+      pass
+    frame0 = BGR2YYYYUV(cv2.warpPerspective(client.frameStream, H, (512,256),flags=cv2.INTER_NEAREST))
+    model.run(frame0,vEgo,0.2)
+    pm.send({'laneLines': model.policyModelOutputs[0][4955:5483].tolist(), 'action': model.policyModelOutputs[0][5880:5882].tolist()}) 
+    elapsed = time.perf_counter() - start
+    sleep_time = period - elapsed
+    if sleep_time > 0:
+      time.sleep(sleep_time)
+    print(f"{1/(time.perf_counter() - start):.2f} Hz\r", end="")
+    # print(vEgo)

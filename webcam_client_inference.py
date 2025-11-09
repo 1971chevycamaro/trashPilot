@@ -1,53 +1,36 @@
 import onnxruntime as ort
 import numpy as np
-from utilities import rgb_to_visionfmt_bilinear as RGBtoVISIONFMT
+from utilities import BGR2YYYYUV
 from class_webcam_client import FrameClient
 import time
+import class_transform
+import cv2
 # Load ONNX model
 client = FrameClient()  # attach to shared memory
-drivingVision = ort.InferenceSession("onnx_test/driving_vision.onnx")
-drivingPolicy = ort.InferenceSession("onnx_test/driving_policy.onnx")
-visionModelInputs = {
-        "img": np.zeros((1,12,128,256), dtype=np.uint8), 
-        "big_img": np.zeros((1,12,128,256), dtype=np.uint8)
-        } # i could fix the BGR->RGB to work natively but meh
-policyModelInputs = {
-        'desire': np.empty((1,25,8), dtype=np.float16),
-        'traffic_convention': np.empty((1,2), dtype=np.float16),
-        'lateral_control_params': np.empty((1,2), dtype=np.float16),
-        'prev_desired_curv': np.empty((1,25,1), dtype=np.float16),
-        'features_buffer': np.empty((1,25,512), dtype=np.float16),
-        }
-visionModelOutputs = np.empty((1, 632), dtype=np.float16)
+frame1BGR = client.frameStream
 
-running = True
+drivingVision = ort.InferenceSession("external/openpilot/selfdrive/modeld/models/driving_vision.onnx")
+visionModelInputs = { # allocate inputs (if we made an array each time it would be slow so we allocate and reuse)
+    "img": np.zeros((1, 12, 128, 256), dtype=np.uint8),
+    "big_img": np.zeros((1, 12, 128, 256), dtype=np.uint8)
+} 
+visionModelOutputs = np.zeros((1, 632), dtype=np.float32)
+H = class_transform.H # i dont want to have to change the same transform everywhere
+H1 =  H
+
 # Inference loop run @ 20Hz
 period = 0.05  # 20Hz
-while running:
-    start = time.perf_counter()
-    frame0BGR = client.getFrame()
-    time.sleep(0.05) # 20Hz
-    frame1BGR = client.getFrame()
-    visionModelInputs["img"][0, 0:6, :, :] = RGBtoVISIONFMT(frame0BGR)
-    visionModelInputs["img"][0, 6:12, :, :] = RGBtoVISIONFMT(frame1BGR)   
-    visionModelInputs["big_img"] = visionModelInputs["img"] # just duplicate for now
-     # Run the model
-    
-
-    visionModelOutputs[:] = drivingVision.run(None, visionModelInputs)[0]
-    print(visionModelOutputs[0,105:117]) # zero out road_transform for now
-
-    # full_features_buffer[0,:-1] = full_features_buffer[0,1:]
-    # full_features_buffer[0,-1] = vision_outputs_dict['hidden_state'][0, :]
-    # numpy_inputs['features_buffer'][:] = full_features_buffer[0, self.temporal_idxs]
-    
-    #print("vision model visionModelOutputs:", visionModelOutputs[0][0][117:629]) # hidden_state slice
-    # keep the 20Hz loop
-    # while time.perf_counter() - start <= period:
-    #     pass
-    # # track time Hz
-    # print("vision model Hz:", 1/(time.perf_counter() - start))
-
+while True:
+  start = time.perf_counter()
+  visionModelInputs["img"][0, 0:6, :, :] = visionModelInputs["img"][0, 6:12, :, :]
+  visionModelInputs["img"][0, 6:12, :, :] = BGR2YYYYUV(cv2.warpPerspective(frame1BGR, H, (512,256),flags=cv2.INTER_NEAREST))   
+  cv2.imshow("input", np.hstack((visionModelInputs["img"][0, 0:6, :, :][0] , visionModelInputs["img"][0, 6:12, :, :][0])))
+  elapsed = time.perf_counter() - start
+  sleep_time = period - elapsed
+  if sleep_time > 0:
+    if cv2.waitKey(int(sleep_time*1000)) == 27:
+      break  # Exit on ESC key
+  print(f"{1/(time.perf_counter() - start):.2f} Hz\r", end="")
 
 
 #     {

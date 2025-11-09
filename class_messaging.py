@@ -5,7 +5,7 @@ import threading
 import time
 
 class PubMaster:
-    def __init__(self, topic, port=5556):
+    def __init__(self, topic, port=5559):
         self.topic = topic
         ctx = zmq.Context.instance()
         self.sock = ctx.socket(zmq.PUB)
@@ -18,7 +18,7 @@ class PubMaster:
 
 
 class SubMaster:
-    def __init__(self, topic, address="localhost", port=5556):
+    def __init__(self, topic, address="localhost", port=5559):
         self.topic = topic
         ctx = zmq.Context.instance()
         self.sock = ctx.socket(zmq.SUB)

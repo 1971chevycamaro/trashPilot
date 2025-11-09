@@ -7,7 +7,7 @@ scripts = [
     "myui.py",
     "display_steering3.py",
     "mycarcontroller.py",
-    "mymodeld2.py"
+    "mymodeld3.py"
     
 ]
 
