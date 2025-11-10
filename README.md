@@ -4,6 +4,7 @@
 
 # TrashPilot
 *its total garbage*  
+https://discord.com/invite/9tB23GRDye
 This is an experimental repository designed to be vastly simpler than openpilots. It exists to document my knowledge of openpilot's codebase. Inside you will find tools to test and replicate various snippets of openpilot. Features currently included are webcam capture and sharing architecture, model inference etc.
 
 ## Setup
