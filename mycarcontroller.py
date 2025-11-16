@@ -27,10 +27,6 @@ if can_available:
 vEgo = 13
 
 while True:
-    # m = bus.recv(timeout=0.0)
-    # vEgo = float(m.data[2]) * 0.28
-    vego_msg = example_capnp.Status.new_message(id=2, name="vEgo", value=vEgo)
-    pub.send(vego_msg.to_bytes())
     try: # look for a torque message
         raw = sub.recv(flags=zmq.NOBLOCK)
 
@@ -51,5 +47,16 @@ while True:
     except zmq.Again:
         pass
         time.sleep(0.1)
+    # m = bus.recv(timeout=0.0)
+    # vEgo += 1
+
+    msg = example_capnp.Event.new_message()
+    msg.logMonoTime = int(time.monotonic() * 1000)
+    car_state = msg.init('carState')
+
+    car_state.vEgo = vEgo 
+
+    pub.send(msg.to_bytes())
+
 # sudo slcand -S 115200 ttyACM0 can0 && sudo ifconfig can0 up 
 # candump can0

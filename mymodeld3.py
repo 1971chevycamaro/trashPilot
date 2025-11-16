@@ -54,19 +54,18 @@ vEgo = 10.0
 # Subscribe to vEgo published by mycarcontroller.py (capnp Status on tcp://localhost:5556)
 example_capnp = capnp.load('experiments/messaging/example.capnp')
 ctx = zmq.Context.instance()
-vego_sub = ctx.socket(zmq.SUB)
-vego_sub.setsockopt_string(zmq.SUBSCRIBE, "")
-vego_sub.setsockopt(zmq.CONFLATE, 1)
-vego_sub.connect("tcp://localhost:5556")
+sub = ctx.socket(zmq.SUB)
+sub.setsockopt_string(zmq.SUBSCRIBE, "")
+sub.setsockopt(zmq.CONFLATE, 1)
+sub.connect("tcp://localhost:5556")
 while True:
   for model in models:
     start = time.perf_counter()
     # Non-blocking read of latest vEgo
     try:
-      raw = vego_sub.recv(flags=zmq.NOBLOCK)
-      with example_capnp.Status.from_bytes(raw) as s:
-        if s.name == "vEgo":
-          vEgo = float(s.value)
+      raw = sub.recv(flags=zmq.NOBLOCK)
+      with example_capnp.Event.from_bytes(raw) as msg:
+        vEgo = msg.carState.vEgo
     except zmq.Again:
       pass
     frame0 = BGR2YYYYUV(cv2.warpPerspective(client.frameStream, H, (512,256),flags=cv2.INTER_NEAREST))

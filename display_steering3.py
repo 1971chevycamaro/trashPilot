@@ -4,6 +4,7 @@ import numpy as np
 import zmq
 import capnp
 from  class_steering_model import SteeringWheelModel
+import time
 
 def draw_torque_graph(screen, torque_history):
     graph_height = 100
@@ -34,11 +35,12 @@ sm = messaging.SubMaster('modelV2')
 example_capnp = capnp.load('experiments/messaging/example.capnp')
 ctx = zmq.Context()
 pub = ctx.socket(zmq.PUB)
-pub.bind("tcp://*:5558")
+pub.bind("tcp://*:5558") # publish carControl
 
 sub = ctx.socket(zmq.SUB)
-sub.connect("tcp://localhost:5556")
 sub.setsockopt_string(zmq.SUBSCRIBE, "")
+sub.setsockopt(zmq.CONFLATE, 1)
+sub.connect("tcp://localhost:5556") # subscribe carState
 
 steeringWheel = SteeringWheelModel(inertia=0.01, centering=0.05,damping=0.1,sfriction=0,kfriction=0.7)
 desiredAngle = 0
@@ -165,18 +167,18 @@ while running:
     # try to get realtime vEgo from socket
     try:
       raw = sub.recv(flags=zmq.NOBLOCK)
-      with example_capnp.Status.from_bytes(raw) as s:
-        if s.name == "vEgo":
-          vEgo = float(s.value)
+      with example_capnp.Event.from_bytes(raw) as msg:
+        vEgo = msg.carState.vEgo
     except zmq.Again:
       pass
 
     text = font.render(f"Error: {error:6.1f} Torque: {steeringWheel.torque:6.1f} {'AUT' if control_enabled else 'MAN'}", True, (255, 255, 255))
     text2 = font.render(f"{vEgo:2.0f} KM/H", True, (255, 255, 255))
-    msg = example_capnp.Status.new_message()
-    msg.id = 1
-    msg.name = "steeringTorque"
-    msg.value = float(np.float32(steeringWheel.torque))
+    msg = example_capnp.Event.new_message()
+    msg.logMonoTime = int(time.monotonic() * 1000)
+
+    msg.init('carControl').actuators.torque = float(steeringWheel.torque)
+
     pub.send(msg.to_bytes())
     screen.fill((30, 30, 30))
     torqueRatio = (steeringWheel.torque/tau_max)*-center_x
