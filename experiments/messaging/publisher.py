@@ -5,11 +5,12 @@ example_capnp = capnp.load('experiments/messaging/example.capnp')
 
 ctx = zmq.Context()
 pub = ctx.socket(zmq.PUB)
-pub.bind("tcp://*:5556")
+pub.bind("tcp://*:5558")
 
 while True:
-    msg = example_capnp.CarControl.new_message()
-    msg.actuators.torque = 1.5
+    msg = example_capnp.Event.new_message()
+    msg.logMonotime = int(time.monotonic() * 1000)
+    msg.init('carControl').actuators.torque = 1.5
     pub.send(msg.to_bytes())
     print("sent:", msg)
     time.sleep(1)
